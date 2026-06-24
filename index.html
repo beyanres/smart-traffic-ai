@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Traffic AI - Deadlock Prevention</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Tajawal', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+.header { text-align: center; margin-bottom: 20px; }
+.header h1 { font-size: 2rem; color: #22d3ee; font-weight: 800; }
+.header p { color: #94a3b8; font-size: 1rem; margin-top: 8px; }
+.sim-box { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: 12px; padding: 20px; margin: 16px 0; width: 100%; max-width: 500px; }
+.checkbox-label { display: flex; align-items: center; gap: 10px; color: #94a3b8; font-size: 1rem; cursor: pointer; }
+.checkbox-label input[type="checkbox"] { width: 20px; height: 20px; accent-color: #22d3ee; }
+.btn { display: inline-block; padding: 12px 32px; background: rgba(34, 211, 238, 0.15); border: 1px solid rgba(34, 211, 238, 0.3); border-radius: 10px; color: #22d3ee; font-weight: 700; cursor: pointer; transition: all 0.3s; font-family: 'Tajawal', sans-serif; font-size: 1rem; margin-top: 10px; }
+.btn:hover { background: rgba(34, 211, 238, 0.25); transform: scale(1.02); }
+#traffic-result { text-align: center; padding: 20px; font-size: 1.1rem; font-weight: 700; min-height: 60px; }
+.traffic-scene { position: relative; height: 220px; background: rgba(15, 23, 42, 0.6); border-radius: 12px; overflow: hidden; margin: 16px 0; border: 2px solid rgba(100, 116, 139, 0.3); }
+.traffic-road-h { position: absolute; top: 50%; left: 0; right: 0; height: 50px; background: rgba(51, 65, 85, 0.6); transform: translateY(-50%); }
+.traffic-road-v { position: absolute; left: 50%; top: 0; bottom: 0; width: 50px; background: rgba(51, 65, 85, 0.6); transform: translateX(-50%); }
+.traffic-intersection { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; background: rgba(71, 85, 105, 0.7); transform: translate(-50%, -50%); border: 2px solid rgba(100, 116, 139, 0.3); border-radius: 4px; z-index: 3; }
+.tl { position: absolute; width: 12px; height: 12px; border-radius: 50%; z-index: 10; transition: background 0.3s; }
+.tl-n { top: 42%; left: 48%; } .tl-s { bottom: 42%; left: 50%; } .tl-e { top: 48%; right: 42%; } .tl-w { top: 50%; left: 42%; }
+.tcar { position: absolute; font-size: 1.2rem; z-index: 5; opacity: 0; }
+@keyframes trafficCarNorth { 0% { top: -10%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { top: 90%; opacity: 0; } }
+@keyframes trafficCarSouth { 0% { bottom: -10%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { bottom: 90%; opacity: 0; } }
+@keyframes trafficCarEast { 0% { right: -10%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { right: 90%; opacity: 0; } }
+@keyframes trafficCarWest { 0% { left: -10%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { left: 90%; opacity: 0; } }
+.tcar-go-n { animation: trafficCarNorth 2s linear forwards; }
+.tcar-go-s { animation: trafficCarSouth 2s linear forwards; }
+.tcar-go-e { animation: trafficCarEast 2s linear forwards; }
+.tcar-go-w { animation: trafficCarWest 2s linear forwards; }
+.status-gridlock { color: #ef4444; } .status-success { color: #10b981; }
+</style>
+</head>
+<body>
+<div class="header"><h1>🚗 Smart Traffic AI</h1><p>Deadlock Prevention - تقاطع طرق ذكي</p></div>
+<div class="sim-box">
+    <div style="margin-bottom:12px;">
+        <label class="checkbox-label"><input type="checkbox" id="traffic-prevention" checked><span>تفعيل Prevention (منع Gridlock)</span></label>
+    </div>
+    <div style="text-align:center;"><button class="btn" onclick="runTraffic()">▶️ تشغيل المحاكاة</button></div>
+    <div id="traffic-result"></div>
+</div>
+<div class="sim-box">
+    <div class="traffic-scene" id="traffic-scene">
+        <div class="traffic-road-h"></div> <div class="traffic-road-v"></div> <div class="traffic-intersection"></div>
+        <div class="tl tl-n" id="tl-n" style="background:#ef4444;"></div>
+        <div class="tl tl-s" id="tl-s" style="background:#ef4444;"></div>
+        <div class="tl tl-e" id="tl-e" style="background:#ef4444;"></div>
+        <div class="tl tl-w" id="tl-w" style="background:#ef4444;"></div>
+        <div class="tcar" id="tc-n1" style="left:52%;top:-10%;">🚗</div>
+        <div class="tcar" id="tc-s1" style="left:44%;bottom:-10%;">🚙</div>
+        <div class="tcar" id="tc-e1" style="right:-10%;top:52%;">🚕</div>
+        <div class="tcar" id="tc-w1" style="left:-10%;top:44%;">🚗</div>
+    </div>
+</div>
+<script>
+function runTraffic() {
+    const scene = document.querySelector('.traffic-scene');
+    const result = document.getElementById('traffic-result');
+    const prevention = document.getElementById('traffic-prevention');
+    const isPrevention = prevention ? prevention.checked : true;
+    if (!scene) return;
+    const tls = scene.querySelectorAll('.tl');
+    scene.querySelectorAll('.tcar').forEach(c => { c.className = 'tcar'; c.style.opacity = '0'; });
+    if (isPrevention) {
+        if (tls[0]) tls[0].style.background = '#10b981';
+        if (tls[1]) tls[1].style.background = '#10b981';
+        if (tls[2]) tls[2].style.background = '#ef4444';
+        if (tls[3]) tls[3].style.background = '#ef4444';
+        setTimeout(() => {
+            const c1 = scene.querySelector('#tc-n1');
+            const c2 = scene.querySelector('#tc-s1');
+            if (c1) c1.classList.add('tcar-go-n');
+            if (c2) c2.classList.add('tcar-go-s');
+        }, 500);
+        setTimeout(() => {
+            if (tls[0]) tls[0].style.background = '#ef4444';
+            if (tls[1]) tls[1].style.background = '#ef4444';
+            if (tls[2]) tls[2].style.background = '#10b981';
+            if (tls[3]) tls[3].style.background = '#10b981';
+        }, 2500);
+        setTimeout(() => {
+            const c3 = scene.querySelector('#tc-e1');
+            const c4 = scene.querySelector('#tc-w1');
+            if (c3) c3.classList.add('tcar-go-e');
+            if (c4) c4.classList.add('tcar-go-w');
+        }, 3000);
+        setTimeout(() => {
+            if (result) result.innerHTML = '<span class="status-success">✅ 4 مركبات عبرت بنجاح! (Prevention مفعل)</span>';
+        }, 5500);
+    } else {
+        if (tls[0]) tls[0].style.background = '#10b981';
+        if (tls[1]) tls[1].style.background = '#10b981';
+        if (tls[2]) tls[2].style.background = '#10b981';
+        if (tls[3]) tls[3].style.background = '#10b981';
+        setTimeout(() => {
+            scene.querySelectorAll('.tcar').forEach(c => { c.style.opacity = '1'; c.style.left = '45%'; c.style.top = '45%'; c.style.bottom = 'auto'; c.style.right = 'auto'; });
+            if (result) result.innerHTML = '<span class="status-gridlock">🛑 Gridlock! جميع الإشارات خضراء → تصادم!</span>';
+        }, 800);
+    }
+}
+</script>
+</body>
+</html>
